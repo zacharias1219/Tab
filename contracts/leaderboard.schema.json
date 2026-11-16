@@ -18,7 +18,7 @@
         "properties": {
           "rank": {"type": "integer", "minimum": 1},
           "model": {"type": "string"},
-          "family": {"enum": ["logistic", "random_forest", "hist_gb", "mlp", "stack"]},
+          "family": {"enum": ["logistic", "random_forest", "hist_gb", "mlp", "stack", "prior"]},
           "params": {"type": "object"},
           "mean_log_loss": {"type": "number", "minimum": 0},
           "ci_low": {"type": "number"},
