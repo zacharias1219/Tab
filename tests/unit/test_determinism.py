@@ -44,8 +44,11 @@ def test_separate_processes_with_different_hash_seeds():
     assert len(digests) == 1
 
 
-def test_different_seed_differs():
+def test_different_seed_changes_the_search():
+    # The seed drives inner folds and model randomness. Final predictions can legitimately coincide
+    # (e.g. a seed-free default logistic model wins under both seeds), so compare the search itself.
     X, y = mixed_frame(300, 5, 2)
-    a = Tab(max_trials=4, seed=1).fit(X, y).predict_proba(X)
-    b = Tab(max_trials=4, seed=2).fit(X, y).predict_proba(X)
-    assert not np.array_equal(a, b)
+    a = Tab(max_trials=4, seed=1).fit(X, y).report_.leaderboard
+    b = Tab(max_trials=4, seed=2).fit(X, y).report_.leaderboard
+    assert [e["mean_log_loss"] for e in a] != [e["mean_log_loss"] for e in b]
+    assert np.isfinite([e["mean_log_loss"] for e in a]).all()
