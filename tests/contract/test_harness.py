@@ -68,7 +68,8 @@ def test_split_dir_holds_no_labels_and_cli_has_no_label_path(work):
     assert "__y" not in pd.read_parquet(Path(sp.split_dir) / "test_X.parquet").columns
     args = runner.build_command("prior", runner.SYSTEMS, sp.split_dir, 20, 0, 1, Path(work["runs"]) / "x")
     joined = " ".join(map(str, args))
-    assert str(sp.label_dir) not in joined and "labels" not in joined
+    # (the pytest tmp dir name itself contains "labels", so check the label paths, not the word)
+    assert str(sp.label_dir) not in joined and "test_y" not in joined and "classes.json" not in joined
     assert Path(sp.label_dir).resolve() not in [Path(sp.split_dir).resolve(), *Path(sp.split_dir).resolve().parents]
 
 
