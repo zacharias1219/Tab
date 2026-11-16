@@ -2,8 +2,7 @@
 
 import pytest
 
-from report.build import MissingSectionData, build_page, REQUIRED_SECTIONS
-from tests.conftest import make_results
+from report.build import REQUIRED_SECTIONS, MissingSectionData, build_page
 
 
 def test_builds_with_complete_data(tmp_path, valid_results):

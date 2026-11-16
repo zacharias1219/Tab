@@ -2,10 +2,8 @@
 
 import ast
 import json
-import sys
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from bench import datasets, runner

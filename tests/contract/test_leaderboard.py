@@ -1,12 +1,11 @@
 """US-4: zoo and leaderboard."""
 
-import numpy as np
 import pytest
 
 from evalkit.schema import validate
 from tab import Tab
-from tab.zoo import FAMILIES, default_config, build_model
 from tab.preprocess import Preprocessor
+from tab.zoo import FAMILIES, build_model, default_config
 
 
 def test_zoo_has_the_four_families():

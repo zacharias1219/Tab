@@ -3,7 +3,7 @@
 import numpy as np
 
 from tab import Tab
-from tab.nested import FitObserver, nested_cross_val, outer_splits, assert_disjoint
+from tab.nested import FitObserver, assert_disjoint, nested_cross_val, outer_splits
 
 
 def _make(observer):

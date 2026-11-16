@@ -1,6 +1,5 @@
 """NFR-2: trial-count mode with a fixed seed gives bitwise-identical predictions on one machine."""
 
-import hashlib
 import subprocess
 import sys
 import textwrap

@@ -5,7 +5,6 @@ The kill criterion (pooled simple-set recall >= 70%) is asserted here on the two
 """
 
 import numpy as np
-import pandas as pd
 import pytest
 from sklearn.datasets import load_wine
 
