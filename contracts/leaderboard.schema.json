@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tab.local/contracts/leaderboard.schema.json",
+  "title": "Tab leaderboard.json (US-4)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "metric", "entries"],
+  "properties": {
+    "schema_version": {"const": "1"},
+    "metric": {"const": "inner_cv_log_loss"},
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rank", "model", "family", "params", "mean_log_loss", "ci_low", "ci_high", "fold_log_loss", "wall_s"],
+        "properties": {
+          "rank": {"type": "integer", "minimum": 1},
+          "model": {"type": "string"},
+          "family": {"enum": ["logistic", "random_forest", "hist_gb", "mlp", "stack"]},
+          "params": {"type": "object"},
+          "mean_log_loss": {"type": "number", "minimum": 0},
+          "ci_low": {"type": "number"},
+          "ci_high": {"type": "number"},
+          "fold_log_loss": {"type": "array", "items": {"type": "number", "minimum": 0}, "minItems": 1},
+          "wall_s": {"type": "number", "minimum": 0}
+        }
+      }
+    }
+  }
+}

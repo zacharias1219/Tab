@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tab.local/contracts/results.schema.json",
+  "title": "results.json envelope (project-neutral) with 3A run records",
+  "description": "Rules that carry PRD claims: actual_wall_s required and positive (HF-5); scores must name evalkit (HF-3); failed runs keep an error and are never dropped; headline metric is skill_score_log_loss only (HF-4); unknown fields rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project", "git_sha", "created_utc", "hardware", "versions", "dataset_list_sha256", "config", "runs", "analyses", "headline"],
+  "properties": {
+    "schema_version": {"const": "1"},
+    "project": {"type": "string", "pattern": "^[0-9A-Za-z][0-9A-Za-z_-]{0,39}$"},
+    "git_sha": {"type": "string", "pattern": "^([0-9a-f]{7,40})(-dirty)?$"},
+    "created_utc": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu_model", "n_logical_cpus", "ram_gb", "os", "python"],
+      "properties": {
+        "cpu_model": {"type": "string"},
+        "n_logical_cpus": {"type": "integer", "minimum": 1},
+        "ram_gb": {"type": "number", "exclusiveMinimum": 0},
+        "os": {"type": "string"},
+        "python": {"type": "string"}
+      }
+    },
+    "versions": {
+      "type": "object",
+      "required": ["tab", "evalkit", "numpy", "pandas", "scikit-learn"],
+      "additionalProperties": {"type": "string"}
+    },
+    "dataset_list_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "budget_s", "folds", "systems", "datasets"],
+      "properties": {
+        "mode": {"enum": ["skeleton", "smoke", "full", "study"]},
+        "budget_s": {"type": "number", "exclusiveMinimum": 0},
+        "folds": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1},
+        "systems": {"type": "array", "items": {"$ref": "#/$defs/system_name"}, "minItems": 1},
+        "datasets": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "n_cpus": {"type": "integer", "minimum": 1},
+        "provisional_params": {"type": "boolean"}
+      }
+    },
+    "runs": {"type": "array", "items": {"$ref": "#/$defs/run"}},
+    "analyses": {"$ref": "#/$defs/analyses"},
+    "headline": {"$ref": "#/$defs/headline"}
+  },
+  "$defs": {
+    "system_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scored_by", "log_loss", "prior_log_loss", "skill", "auc", "ece", "n_test"],
+      "properties": {
+        "scored_by": {"type": "string", "pattern": "^evalkit@[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "log_loss": {"type": "number", "minimum": 0},
+        "prior_log_loss": {"type": "number", "exclusiveMinimum": 0},
+        "skill": {"type": "number"},
+        "auc": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "ece": {"type": "number", "minimum": 0, "maximum": 1},
+        "n_test": {"type": "integer", "minimum": 1}
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "system", "dataset", "task_id", "fold", "seed", "budget_s", "actual_wall_s", "peak_rss_gb_tree", "n_cpus", "status", "error", "exit_code", "proba_sha256", "budget_ratio", "within_nfr1", "stop_reason", "n_trials", "scores"],
+      "properties": {
+        "run_id": {"type": "string", "pattern": "^[a-z0-9_]+__[A-Za-z0-9_.-]+__f[0-9]+__s[0-9]+$"},
+        "system": {"$ref": "#/$defs/system_name"},
+        "dataset": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"},
+        "task_id": {"type": ["integer", "null"]},
+        "fold": {"type": "integer", "minimum": 0},
+        "seed": {"type": "integer", "minimum": 0},
+        "budget_s": {"type": "number", "exclusiveMinimum": 0},
+        "actual_wall_s": {"type": "number", "exclusiveMinimum": 0},
+        "peak_rss_gb_tree": {"type": "number", "minimum": 0},
+        "n_cpus": {"type": "integer", "minimum": 1},
+        "status": {"enum": ["ok", "error", "timeout", "oom"]},
+        "error": {"type": ["string", "null"]},
+        "exit_code": {"type": ["integer", "null"]},
+        "proba_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "budget_ratio": {"type": "number", "exclusiveMinimum": 0},
+        "within_nfr1": {"type": "boolean"},
+        "stop_reason": {"type": ["string", "null"]},
+        "n_trials": {"type": ["integer", "null"], "minimum": 0},
+        "scores": {"oneOf": [{"$ref": "#/$defs/scores"}, {"type": "null"}]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "ok"}}},
+          "then": {"properties": {"scores": {"$ref": "#/$defs/scores"}, "proba_sha256": {"$ref": "#/$defs/sha256"}, "error": {"type": "null"}}},
+          "else": {"properties": {"error": {"type": "string", "minLength": 1}, "scores": {"type": "null"}}}
+        }
+      ]
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estimate", "ci_low", "ci_high"],
+      "properties": {
+        "estimate": {"type": "number"},
+        "ci_low": {"type": "number"},
+        "ci_high": {"type": "number"}
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "n_datasets", "mean_diff", "ci_low", "ci_high", "verdict", "wins", "ties", "losses"],
+      "properties": {
+        "baseline": {"$ref": "#/$defs/system_name"},
+        "n_datasets": {"type": "integer", "minimum": 0},
+        "mean_diff": {"type": ["number", "null"]},
+        "ci_low": {"type": ["number", "null"]},
+        "ci_high": {"type": ["number", "null"]},
+        "verdict": {"enum": ["win", "tie", "loss", "insufficient"]},
+        "wins": {"type": "integer", "minimum": 0},
+        "ties": {"type": "integer", "minimum": 0},
+        "losses": {"type": "integer", "minimum": 0},
+        "secondary": {"type": "object"}
+      }
+    },
+    "headline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "system", "is_claim", "statement", "comparisons"],
+      "properties": {
+        "metric": {"const": "skill_score_log_loss"},
+        "system": {"$ref": "#/$defs/system_name"},
+        "is_claim": {"type": "boolean"},
+        "statement": {"type": "string", "minLength": 1},
+        "comparisons": {"type": "array", "items": {"$ref": "#/$defs/comparison"}}
+      }
+    },
+    "analyses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["per_dataset", "nfr1", "cost"],
+      "properties": {
+        "per_dataset": {"type": "array", "items": {"type": "object"}},
+        "nfr1": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["system", "n_runs", "n_within", "fraction_within", "passes", "overruns"],
+          "properties": {
+            "system": {"$ref": "#/$defs/system_name"},
+            "n_runs": {"type": "integer", "minimum": 0},
+            "n_within": {"type": "integer", "minimum": 0},
+            "fraction_within": {"type": ["number", "null"]},
+            "passes": {"type": ["boolean", "null"]},
+            "overruns": {"type": "array", "items": {"type": "object"}}
+          }
+        },
+        "cost": {"type": "array", "items": {"type": "object"}},
+        "floor_check": {"type": "object"},
+        "leak_study": {"type": "object"},
+        "controller_study": {"type": "object"},
+        "time_study": {"type": "object"},
+        "stacking_ablation": {"type": "object"},
+        "memory": {"type": "object"}
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+[project]
+name = "tab-automl"
+version = "0.1.0"
+description = "Tab: a small tabular AutoML system whose product is honest measurement."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = { file = "LICENSE" }
+dependencies = [
+    "numpy>=1.26,<2.6",
+    "pandas>=2.2,<2.4",
+    "scikit-learn>=1.5,<1.10",
+    "scipy>=1.11,<1.19",
+    "pyarrow>=15",
+    "psutil>=5.9",
+    "jsonschema>=4.20",
+]
+
+[project.optional-dependencies]
+# Baselines live only here (NFR-6, HF-7). tab/ never imports them.
+bench = [
+    "flaml[automl]==2.8.0",
+    "autogluon.tabular[all]==1.6.3",
+]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pip-audit>=2.7",
+    "pre-commit>=3.7",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["tab*", "evalkit*", "bench*", "report*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.csv", "*.md", "*.html", "*.css"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers -m 'not bench_extra'"
+markers = [
+    "bench_extra: needs the optional bench extra (FLAML, AutoGluon); run with -m bench_extra",
+    "slow: takes more than ~10 s",
+]
+filterwarnings = ["ignore::DeprecationWarning:sklearn.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "NPY"]
+ignore = ["S101", "S603", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["evalkit.*"]
+strict = true

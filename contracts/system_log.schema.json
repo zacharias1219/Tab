@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tab.local/contracts/system_log.schema.json",
+  "title": "Optional log a system writes about its own search",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "stop_reason": {"type": ["string", "null"]},
+    "n_trials": {"type": ["integer", "null"], "minimum": 0},
+    "extra": {"type": "object"}
+  }
+}
