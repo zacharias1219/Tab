@@ -138,3 +138,34 @@ Ceiling: maximum wall-clock allowed, a limit and not a target. Actual seconds: m
 4. The user names the time column; no auto-detection in v1.
 5. Preprocessing leak is covered by the canary tests, not by the data-level detector.
 6. No LLM judge anywhere.
+
+## 14. Check status (Phase 6 build, 2026-11-16)
+| Req ID | Check | Status |
+|---|---|---|
+| US-1 | tests/contract/test_fit_predict.py | green |
+| US-2 | tests/canary/test_preproc_leak.py (leaky variant caught) | green |
+| US-3 | tests/unit/test_nested_cv.py, tests/canary/test_nested_leak.py | green |
+| US-4 | tests/contract/test_leaderboard.py | green |
+| US-5 | tests/unit/test_calibration.py | green |
+| US-6 | tests/eval/test_importance.py (20 seeds, >= 19) | green |
+| US-7 | tests/eval/test_controller.py (8 curves + ceiling, failed trial, purity) | green |
+| US-8 | tests/eval/test_leak_cases.py (30 cases, kill criterion), bench/leak_study.py, tests/eval/test_studies.py | green on CI tables; 240-case study pending frozen list |
+| US-9 | tests/unit/test_time_split.py (property + 6 cases) | green |
+| US-10 | tests/canary/test_stack_leak.py; bench/ablation.py | green; tier-1 ablation pending benchmark |
+| US-11 | tests/contract/test_harness.py, tests/unit/test_evalkit.py | green |
+| US-12 | tests/unit/test_cost.py (500 MB grandchild within 15%) | green |
+| US-13 | `bench.cli repro` + ci/smoke_reference.json, CI job | green locally; CI on push |
+| US-14 | tests/contract/test_page.py | green |
+| NFR-1 | runner flags `within_nfr1` per run; analyses.nfr1 | wired; measured on benchmark |
+| NFR-2 | tests/unit/test_determinism.py (in-process and two hash seeds) | green |
+| NFR-3 | analyses.memory (largest-dataset peak vs 8 GB) | wired; measured on benchmark |
+| NFR-4 | ci/timing_gate.py 180 s on the test suite | green (about 50 s) |
+| NFR-5 | tests/eval/test_data_robustness.py | green |
+| NFR-6 / HF-7 | tests/unit/test_no_competitor_imports.py | green |
+| NFR-7 | ci/timing_gate.py 900 s on smoke | green (about 10 s) |
+| HF-1 | tests/canary/ (preprocessing, nested CV, stacking, calibration spy) | green |
+| HF-2 | ci/dataset_hash.py, tests/unit/test_datasets.py | wired; activates at freeze |
+| HF-3 | tests/contract/test_harness.py (self-scorer rejected, AST ban) | green |
+| HF-4 | tests/contract/test_headline.py, tests/contract/test_page.py | green |
+| HF-5 | tests/contract/test_results_schema.py | green |
+| HF-6 | ci/prereg_order.py | green (no results committed yet) |

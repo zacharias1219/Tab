@@ -23,7 +23,9 @@ class FitObserver:
         self.records.append((stage, np.asarray(index).copy()))
 
     def record_oof(self, fit_rows, pred_rows) -> None:
-        self.provenance.append({"fit_rows": np.asarray(fit_rows).copy(), "pred_rows": np.asarray(pred_rows).copy()})
+        self.provenance.append(
+            {"fit_rows": np.asarray(fit_rows).copy(), "pred_rows": np.asarray(pred_rows).copy()}
+        )
 
 
 def assert_disjoint(observer: FitObserver, test_index) -> None:
@@ -33,7 +35,9 @@ def assert_disjoint(observer: FitObserver, test_index) -> None:
         assert not leaked, f"stage {stage!r} was fitted on {len(leaked)} outer-test rows"
 
 
-def inner_folds(y_codes: np.ndarray, n_splits: int, seed: int) -> list[tuple[np.ndarray, np.ndarray]]:
+def inner_folds(
+    y_codes: np.ndarray, n_splits: int, seed: int
+) -> list[tuple[np.ndarray, np.ndarray]]:
     counts = np.bincount(y_codes)
     counts = counts[counts > 0]
     n = y_codes.size
@@ -44,13 +48,19 @@ def inner_folds(y_codes: np.ndarray, n_splits: int, seed: int) -> list[tuple[np.
     return [(tr, te) for tr, te in cv2.split(np.zeros(n))]
 
 
-def outer_splits(y: pd.Series, n_splits: int = 5, seed: int = 0) -> list[tuple[np.ndarray, np.ndarray]]:
+def outer_splits(
+    y: pd.Series, n_splits: int = 5, seed: int = 0
+) -> list[tuple[np.ndarray, np.ndarray]]:
     codes = np.unique(pd.Series(y).astype(str).to_numpy(), return_inverse=True)[1]
     return inner_folds(codes, n_splits, seed)
 
 
 def nested_cross_val(
-    make_model: Callable[[FitObserver], Any], X: pd.DataFrame, y: pd.Series, outer: int = 5, seed: int = 0
+    make_model: Callable[[FitObserver], Any],
+    X: pd.DataFrame,
+    y: pd.Series,
+    outer: int = 5,
+    seed: int = 0,
 ) -> list[dict[str, Any]]:
     """Outer k-fold around a Tab-like estimator whose own fit runs the inner CV.
 
@@ -68,5 +78,13 @@ def nested_cross_val(
         known = np.array([v in idx for v in yt])
         codes = np.array([idx[v] for v in yt[known]], dtype=np.int64)
         ll = log_loss(codes, p[known]) if known.any() else float("nan")
-        out.append({"fold": i, "test_index": X.index[te], "observer": obs, "log_loss": ll, "n_test": len(te)})
+        out.append(
+            {
+                "fold": i,
+                "test_index": X.index[te],
+                "observer": obs,
+                "log_loss": ll,
+                "n_test": len(te),
+            }
+        )
     return out

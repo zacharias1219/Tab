@@ -17,12 +17,20 @@ from tab._metrics import ece, log_loss_rows
 from tab.calibration import apply_temperature, cross_fit_calibration
 from tab.config import ControllerConfig
 from tab.controller import should_stop
-from tab.leak import detect_leaks
+from tab.leak import DEFAULT_THRESHOLD, detect_leaks
 from tab.nested import inner_folds
 from tab.preprocess import Preprocessor, dedupe_columns, normalize_frame
 from tab.stacking import Stacker
 from tab.time_split import forward_chaining_splits
-from tab.zoo import DEFAULT_ORDER, FAMILIES, build_model, default_config, fit_quiet, full_proba, sample_config
+from tab.zoo import (
+    DEFAULT_ORDER,
+    FAMILIES,
+    build_model,
+    default_config,
+    fit_quiet,
+    full_proba,
+    sample_config,
+)
 
 INNER_FOLDS = 3
 STACK_MAX_BASE = 4
@@ -106,6 +114,7 @@ class FitReport:
     ceiling_s: float | None
     max_trials: int | None
     timings: dict[str, float]
+    history: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -123,6 +132,7 @@ class Tab:
         time_col: str | None = None,
         stacking: bool = True,
         calibrate: bool = True,
+        leak_threshold: float | None = None,
         _observer: Any = None,
     ):
         if (ceiling_s is None) == (max_trials is None):
@@ -139,6 +149,7 @@ class Tab:
         self.time_col = time_col
         self.stacking = stacking
         self.calibrate = calibrate
+        self.leak_threshold = leak_threshold
         self._observer = _observer
         self._fitted = False
 
@@ -165,15 +176,31 @@ class Tab:
         index = X.index.to_numpy()
         obs = self._observer
         time_mode = self.ceiling_s is not None
-        deadline = t0 + (self.ceiling_s or 0.0)
+        ceiling = float(self.ceiling_s or 0.0)
+        deadline = t0 + ceiling
 
         # leak scan (cheap, flags only)
         ts_l = time.perf_counter()
         try:
-            leak = detect_leaks(X, y.to_numpy(), null_columns=0, seed=self.seed, max_rows=LEAK_SCAN_ROWS)
+            leak = detect_leaks(
+                X,
+                y.to_numpy(),
+                threshold=self.leak_threshold or DEFAULT_THRESHOLD,
+                null_columns=0,
+                seed=self.seed,
+                max_rows=LEAK_SCAN_ROWS,
+            )
             leak_flags = [f for f in leak.flags if f["flagged"]]
         except Exception as e:  # never let a diagnostic break fitting
-            leak_flags = [{"column": None, "type": "detector_error", "score": 0.0, "flagged": False, "error": str(e)}]
+            leak_flags = [
+                {
+                    "column": None,
+                    "type": "detector_error",
+                    "score": 0.0,
+                    "flagged": False,
+                    "error": str(e),
+                }
+            ]
         timings["leak_scan_s"] = time.perf_counter() - ts_l
 
         # inner folds
@@ -213,7 +240,9 @@ class Tab:
                     models.append(m)
                 rows = log_loss_rows(yc[mask], oof[mask])
                 t.mean_loss = float(rows.mean())
-                half = 1.96 * float(rows.std(ddof=1)) / math.sqrt(rows.size) if rows.size > 1 else 0.0
+                half = (
+                    1.96 * float(rows.std(ddof=1)) / math.sqrt(rows.size) if rows.size > 1 else 0.0
+                )
                 t.ci = (t.mean_loss - half, t.mean_loss + half)
                 t.fold_losses = [float(log_loss_rows(yc[va], oof[va]).mean()) for _, va in folds]
                 t.oof = oof
@@ -256,10 +285,14 @@ class Tab:
             if self.max_trials is not None and i >= self.max_trials:
                 stop_reason = "max_trials"
                 break
-            cfg = default_config(DEFAULT_ORDER[i], n, X.shape[1]) if i < len(DEFAULT_ORDER) else sample_config(rng, n, X.shape[1])
+            cfg = (
+                default_config(DEFAULT_ORDER[i], n, X.shape[1])
+                if i < len(DEFAULT_ORDER)
+                else sample_config(rng, n, X.shape[1])
+            )
             if time_mode:
                 now = time.perf_counter()
-                budget_end = t0 + TIME_SAFETY * self.ceiling_s
+                budget_end = t0 + TIME_SAFETY * ceiling
                 fits = now + 1.3 * est_trial(cfg) + est_finalize() <= budget_end
                 tries = 0
                 while not fits and tries < 6:
@@ -305,6 +338,7 @@ class Tab:
             for t in ok:
                 best_by_fam.setdefault(t.family, t)
             bases = list(best_by_fam.values())[:STACK_MAX_BASE]
+            base_oof: list[np.ndarray] = [b.oof for b in bases if b.oof is not None]
             if self.stacking and len(bases) >= 2:
                 stack_considered = True
                 stack_oof = np.full((n, k), np.nan)
@@ -313,11 +347,13 @@ class Tab:
                     tem = fold_id == f
                     if obs is not None:
                         obs.record("stacker", index[trm])
-                    st = Stacker(seed=self.seed).fit([b.oof[trm] for b in bases], yc[trm], k)
-                    stack_oof[tem] = st.predict_proba([b.oof[tem] for b in bases])
+                    st = Stacker(seed=self.seed).fit([o[trm] for o in base_oof], yc[trm], k)
+                    stack_oof[tem] = st.predict_proba([o[tem] for o in base_oof])
                 rows = log_loss_rows(yc[mask], stack_oof[mask])
                 stack_loss = float(rows.mean())
-                half = 1.96 * float(rows.std(ddof=1)) / math.sqrt(rows.size) if rows.size > 1 else 0.0
+                half = (
+                    1.96 * float(rows.std(ddof=1)) / math.sqrt(rows.size) if rows.size > 1 else 0.0
+                )
                 lb_extra.append(
                     {
                         "model": "stack(" + ",".join(b.name for b in bases) + ")",
@@ -326,14 +362,19 @@ class Tab:
                         "mean_log_loss": stack_loss,
                         "ci_low": stack_loss - half,
                         "ci_high": stack_loss + half,
-                        "fold_log_loss": [float(log_loss_rows(yc[fold_id == f], stack_oof[fold_id == f]).mean()) for f in range(len(folds))],
+                        "fold_log_loss": [
+                            float(log_loss_rows(yc[fold_id == f], stack_oof[fold_id == f]).mean())
+                            for f in range(len(folds))
+                        ],
                         "wall_s": 0.0,
                     }
                 )
                 if stack_loss < best.mean_loss - 1e-4:
                     if obs is not None:
                         obs.record("stacker", index[mask])
-                    self._stacker = Stacker(seed=self.seed).fit([b.oof[mask] for b in bases], yc[mask], k)
+                    self._stacker = Stacker(seed=self.seed).fit(
+                        [o[mask] for o in base_oof], yc[mask], k
+                    )
                     self._plan = {"kind": "stack", "members": bases}
                     chosen_oof = stack_oof
 
@@ -344,7 +385,9 @@ class Tab:
             ece_before = ece(yc[mask], chosen_oof[mask])
             ece_after = ece_before
             if self.calibrate:
-                res = cross_fit_calibration(chosen_oof[mask], yc[mask], fold_id[mask], observer=obs, index=index[mask])
+                res = cross_fit_calibration(
+                    chosen_oof[mask], yc[mask], fold_id[mask], observer=obs, index=index[mask]
+                )
                 ece_after = res.ece_after if res.use else ece_before
                 if res.use:
                     self._temperature = res.temperature
@@ -357,24 +400,32 @@ class Tab:
         if self._plan["kind"] != "prior":
             members: list[Trial] = self._plan["members"]
             est = sum(0.6 * m.wall_s for m in members)
-            short = time_mode and (time.perf_counter() + est > deadline - 0.02 * self.ceiling_s)
+            short = time_mode and (time.perf_counter() + est > deadline - 0.02 * ceiling)
             if short and all(m.fold_models for m in members):
                 refit_mode = "fold_bag"
-                self._fitted_members = [(m.family, None, m.fold_models) for m in members]
-                self._fold_preproc = {}
+                self._fitted_members: list[tuple[str, Any, Any]] = [
+                    (m.family, None, m.fold_models) for m in members
+                ]
+                self._fold_preproc: dict[str, list[Preprocessor]] = {}
                 for m in members:
                     mode = FAMILIES[m.family].preproc_mode
                     if mode not in self._fold_preproc:
-                        self._fold_preproc[mode] = [Preprocessor(mode=mode, observer=obs).fit(X.iloc[tr]) for tr, _ in folds]
+                        self._fold_preproc[mode] = [
+                            Preprocessor(mode=mode, observer=obs).fit(X.iloc[tr]) for tr, _ in folds
+                        ]
             else:
                 refit_mode = "full"
                 pres: dict[str, Preprocessor] = {}
-                fitted = []
+                fitted: list[tuple[str, Any, Any]] = []
                 for m in members:
                     mode = FAMILIES[m.family].preproc_mode
                     if mode not in pres:
                         pres[mode] = Preprocessor(mode=mode, observer=obs).fit(X)
-                    model = fit_quiet(build_model(m.cfg, self.seed + m.idx, self.n_jobs), pres[mode].transform(X), yc)
+                    model = fit_quiet(
+                        build_model(m.cfg, self.seed + m.idx, self.n_jobs),
+                        pres[mode].transform(X),
+                        yc,
+                    )
                     if obs is not None:
                         obs.record("model", index)
                     fitted.append((m.family, model, None))
@@ -400,12 +451,24 @@ class Tab:
         ] + lb_extra
         if not lb:
             rows = log_loss_rows(yc[mask], np.tile(self._prior, (int(mask.sum()), 1)))
-            lb = [{"model": "prior", "family": "prior", "params": {}, "mean_log_loss": float(rows.mean()),
-                   "ci_low": float(rows.mean()), "ci_high": float(rows.mean()), "fold_log_loss": [float(rows.mean())], "wall_s": 0.0}]
+            lb = [
+                {
+                    "model": "prior",
+                    "family": "prior",
+                    "params": {},
+                    "mean_log_loss": float(rows.mean()),
+                    "ci_low": float(rows.mean()),
+                    "ci_high": float(rows.mean()),
+                    "fold_log_loss": [float(rows.mean())],
+                    "wall_s": 0.0,
+                }
+            ]
         lb.sort(key=lambda e: (e["mean_log_loss"], e["model"]))
-        for r, e in enumerate(lb, 1):
-            e["rank"] = r
-        chosen = {"prior": "prior", "single": ok[0].name if ok else "prior", "stack": "stack"}[self._plan["kind"]]
+        for rank, entry in enumerate(lb, 1):
+            entry["rank"] = rank
+        chosen = {"prior": "prior", "single": ok[0].name if ok else "prior", "stack": "stack"}[
+            self._plan["kind"]
+        ]
         self._k = k
         self._fitted = True
         self.report_ = FitReport(
@@ -429,6 +492,16 @@ class Tab:
             ceiling_s=self.ceiling_s,
             max_trials=self.max_trials,
             timings=timings,
+            history=[
+                {
+                    "trial": t.idx,
+                    "family": t.family,
+                    "loss": (None if not math.isfinite(t.mean_loss) else t.mean_loss),
+                    "wall_s": t.wall_s,
+                    "status": t.status,
+                }
+                for t in trials
+            ],
         )
         return self
 
@@ -437,7 +510,9 @@ class Tab:
         """Keep fold models only for the current best trial of each family (memory bound)."""
         best: dict[str, Trial] = {}
         for t in trials:
-            if t.status == "ok" and (t.family not in best or t.mean_loss < best[t.family].mean_loss):
+            if t.status == "ok" and (
+                t.family not in best or t.mean_loss < best[t.family].mean_loss
+            ):
                 best[t.family] = t
         keep = {id(t) for t in best.values()}
         for t in trials:
@@ -471,7 +546,10 @@ class Tab:
                 if fold_models is None:
                     probas.append(full_proba(model, self._pre[mode].transform(X), self._k))
                 else:
-                    ps = [full_proba(m, pre.transform(X), self._k) for m, pre in zip(fold_models, self._fold_preproc[mode], strict=True)]
+                    ps = [
+                        full_proba(m, pre.transform(X), self._k)
+                        for m, pre in zip(fold_models, self._fold_preproc[mode], strict=True)
+                    ]
                     probas.append(np.mean(ps, axis=0))
             p = self._stacker.predict_proba(probas) if self._plan["kind"] == "stack" else probas[0]
             if self._temperature is not None:
@@ -486,7 +564,22 @@ class Tab:
             raise RuntimeError("not fitted")
         entries = []
         for e in self.report_.leaderboard:
-            entries.append({k: e[k] for k in ("rank", "model", "family", "params", "mean_log_loss", "ci_low", "ci_high", "fold_log_loss", "wall_s")})
+            entries.append(
+                {
+                    k: e[k]
+                    for k in (
+                        "rank",
+                        "model",
+                        "family",
+                        "params",
+                        "mean_log_loss",
+                        "ci_low",
+                        "ci_high",
+                        "fold_log_loss",
+                        "wall_s",
+                    )
+                }
+            )
         return {"schema_version": "1", "metric": "inner_cv_log_loss", "entries": entries}
 
     def write_leaderboard(self, path: str | Path) -> Path:

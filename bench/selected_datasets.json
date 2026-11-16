@@ -1,0 +1,17 @@
+{
+  "status": "unfrozen",
+  "note": "Paste the frozen tier-1 (20) and tier-2 (8) task lists and the 54 eligible CC18 task ids from '3A Evidence: Spike and Dataset Freeze', then run `python -m bench.cli freeze` once. That writes bench/selected_datasets.sha256, after which CI fails on any change (HF-2). The full benchmark refuses to run while status is 'unfrozen'.",
+  "source": "OpenML-CC18",
+  "folds": [0, 1, 2, 3, 4],
+  "tier1": [],
+  "tier2": [],
+  "eligible": [],
+  "dev_pool": [],
+  "time_aware": {"name": "electricity", "task_id": 219, "time_column": "date"},
+  "extra": [
+    {"name": "credit-g", "task_id": 31, "note": "walking skeleton locally; seen in spike"},
+    {"name": "electricity", "task_id": 219, "note": "time-aware study candidate"},
+    {"name": "adult", "task_id": 7592, "note": "seen in spike"},
+    {"name": "GesturePhaseSegmentationProcessed", "task_id": 14969, "note": "seen in spike"}
+  ]
+}

@@ -35,7 +35,8 @@ def compare_systems(
         n = min(a.size, b.size)
         fold_diff = a[:n] - b[:n]
         diffs.append(float(fold_diff.mean()))
-        v = stats.verdict(fold_diff)
+        # one fold cannot carry a per-dataset verdict: it counts as a tie
+        v = stats.verdict(fold_diff) if n >= 2 else "tie"
         wins += v == "win"
         ties += v == "tie"
         losses += v == "loss"
@@ -61,8 +62,11 @@ def compare_systems(
         auc_shared = [d for d in shared if d in auc_a and d in auc_b]
         if auc_shared:
             ad = [float(np.mean(auc_a[d]) - np.mean(auc_b[d])) for d in auc_shared]
-            out["secondary"] = {"auc_mean_diff": float(np.mean(ad)), "auc_n_datasets": len(ad),
-                                "note": "AUC is secondary and cannot change the verdict (HF-4)"}
+            out["secondary"] = {
+                "auc_mean_diff": float(np.mean(ad)),
+                "auc_n_datasets": len(ad),
+                "note": "AUC is secondary and cannot change the verdict (HF-4)",
+            }
     return out
 
 
@@ -78,8 +82,12 @@ def _phrase(c: Mapping[str, Any]) -> str:
     )
 
 
-def build_headline(system: str, comparisons: list[dict[str, Any]], n_datasets: int) -> dict[str, Any]:
-    is_claim = n_datasets >= CLAIM_MIN_DATASETS and all(c["verdict"] != "insufficient" for c in comparisons)
+def build_headline(
+    system: str, comparisons: list[dict[str, Any]], n_datasets: int
+) -> dict[str, Any]:
+    is_claim = n_datasets >= CLAIM_MIN_DATASETS and all(
+        c["verdict"] != "insufficient" for c in comparisons
+    )
     parts = [_phrase(c) for c in comparisons] or ["no baseline compared"]
     prefix = "" if is_claim else f"n = {n_datasets}, not yet a claim. "
     return {

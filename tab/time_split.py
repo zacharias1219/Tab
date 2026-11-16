@@ -68,6 +68,8 @@ def forward_chaining_splits(
         if va.size == 0:
             raise ValueError(f"gap {gap} is larger than the data allows for split {i}")
         if yv is not None and np.unique(yv[va]).size < 2:
-            warnings.warn(f"time split {i}: validation fold has a single class", UserWarning, stacklevel=2)
+            warnings.warn(
+                f"time split {i}: validation fold has a single class", UserWarning, stacklevel=2
+            )
         splits.append((tr, va))
     return splits

@@ -33,7 +33,9 @@ def check_oof_provenance(records: Sequence[dict]) -> None:
         fit = np.asarray(r["fit_rows"])
         pred = np.asarray(r["pred_rows"])
         overlap = np.intersect1d(fit, pred)
-        assert overlap.size == 0, f"{overlap.size} rows predicted by a model that was fitted on them"
+        assert overlap.size == 0, (
+            f"{overlap.size} rows predicted by a model that was fitted on them"
+        )
 
 
 def meta_features(probas: Sequence[np.ndarray]) -> np.ndarray:

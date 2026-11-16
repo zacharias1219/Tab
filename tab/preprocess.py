@@ -56,9 +56,9 @@ def _numeric_values(s: pd.Series, kind: str) -> np.ndarray:
         v = s.astype("int64").to_numpy().astype(np.float64)
         v[s.isna().to_numpy()] = np.nan
         return v
-    return pd.to_numeric(s.astype("Float64") if pd.api.types.is_bool_dtype(s) else s, errors="coerce").to_numpy(
-        dtype=np.float64, na_value=np.nan
-    )
+    return pd.to_numeric(
+        s.astype("Float64") if pd.api.types.is_bool_dtype(s) else s, errors="coerce"
+    ).to_numpy(dtype=np.float64, na_value=np.nan)
 
 
 def _cat_values(s: pd.Series) -> np.ndarray:
@@ -76,7 +76,9 @@ class Preprocessor:
         if mode not in {"onehot", "ordinal"}:
             raise ValueError(mode)
         self.mode = mode
-        self.max_levels = max_levels if max_levels is not None else (20 if mode == "onehot" else 254)
+        self.max_levels = (
+            max_levels if max_levels is not None else (20 if mode == "onehot" else 254)
+        )
         self.observer = observer
 
     # -- fit ---------------------------------------------------------------------------------
@@ -171,9 +173,17 @@ class Preprocessor:
 
 def _stats_equal(a: Any, b: Any) -> bool:
     if isinstance(a, dict):
-        return isinstance(b, dict) and a.keys() == b.keys() and all(_stats_equal(a[k], b[k]) for k in a)
+        return (
+            isinstance(b, dict)
+            and a.keys() == b.keys()
+            and all(_stats_equal(a[k], b[k]) for k in a)
+        )
     if isinstance(a, list):
-        return isinstance(b, list) and len(a) == len(b) and all(_stats_equal(x, y) for x, y in zip(a, b, strict=True))
+        return (
+            isinstance(b, list)
+            and len(a) == len(b)
+            and all(_stats_equal(x, y) for x, y in zip(a, b, strict=True))
+        )
     if isinstance(a, float):
         return isinstance(b, float) and (a == b or (np.isnan(a) and np.isnan(b)))
     return a == b
@@ -198,7 +208,9 @@ def fold_clean(
         if column_kind(s) == "numeric" and not pd.api.types.is_bool_dtype(s):
             pert[c] = pd.to_numeric(s, errors="coerce") * 3.0 + 1000.0
         else:
-            pert[c] = pd.Series([f"perturbed{i % 7}" for i in range(len(s))], index=s.index, dtype=object)
+            pert[c] = pd.Series(
+                [f"perturbed{i % 7}" for i in range(len(s))], index=s.index, dtype=object
+            )
     pert = pert.iloc[rng.permutation(len(pert))]
 
     if pass_peek:

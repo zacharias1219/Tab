@@ -13,7 +13,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-
 from sklearn.tree import DecisionTreeClassifier
 
 from tab.preprocess import _cat_values, column_kind, normalize_frame
@@ -72,9 +71,16 @@ def _column_values(s: pd.Series) -> tuple[np.ndarray, bool]:
             inv = remap[inv]
         return inv.astype(np.int64), True
     if kind == "datetime":
-        arr = s.astype("int64").astype(float).where(~s.isna()).to_numpy(dtype=np.float64, na_value=np.nan)
+        arr = (
+            s.astype("int64")
+            .astype(float)
+            .where(~s.isna())
+            .to_numpy(dtype=np.float64, na_value=np.nan)
+        )
     else:
-        v = pd.to_numeric(s.astype("Float64") if pd.api.types.is_bool_dtype(s) else s, errors="coerce")
+        v = pd.to_numeric(
+            s.astype("Float64") if pd.api.types.is_bool_dtype(s) else s, errors="coerce"
+        )
         arr = v.to_numpy(dtype=np.float64, na_value=np.nan)
     nan = np.isnan(arr)
     finite = arr[~nan]
@@ -91,7 +97,14 @@ def _column_values(s: pd.Series) -> tuple[np.ndarray, bool]:
     return arr, False
 
 
-def _fold_groups(values: np.ndarray, discrete: bool, y: np.ndarray, tr: np.ndarray, te: np.ndarray, n_groups_cap: int = N_BINS):
+def _fold_groups(
+    values: np.ndarray,
+    discrete: bool,
+    y: np.ndarray,
+    tr: np.ndarray,
+    te: np.ndarray,
+    n_groups_cap: int = N_BINS,
+):
     if discrete:
         return values[tr], values[te], int(values.max()) + 1
     tree = DecisionTreeClassifier(
@@ -117,7 +130,9 @@ def _fold_ids(n: int, seed: int) -> np.ndarray:
     return rng.permutation(n) % N_FOLDS
 
 
-def single_column_skill(values: np.ndarray, discrete: bool, y: np.ndarray, k: int, folds: np.ndarray) -> float:
+def single_column_skill(
+    values: np.ndarray, discrete: bool, y: np.ndarray, k: int, folds: np.ndarray
+) -> float:
     """Cross-validated skill of a one-column predictor: per-group class frequencies smoothed toward the
     prior (groups = categories, or leaves of a depth-limited 1-D tree for continuous columns)."""
     ll = 0.0
@@ -165,7 +180,10 @@ def _runs_z(y: np.ndarray, k: int) -> float:
 def _row_hashes(X: pd.DataFrame) -> np.ndarray:
     Xn = X.astype(object).where(pd.notna(X), "__nan__")
     return np.array(
-        [hashlib.sha1("\x1f".join(map(str, r)).encode()).hexdigest() for r in Xn.itertuples(index=False, name=None)]  # noqa: S324
+        [
+            hashlib.sha256("\x1f".join(map(str, r)).encode()).hexdigest()
+            for r in Xn.itertuples(index=False, name=None)
+        ]
     )
 
 
@@ -203,7 +221,9 @@ def _null_columns(n: int, m: int, seed: int) -> pd.DataFrame:
     return pd.DataFrame({f"__null{i}__": makers[i % len(makers)]() for i in range(m)})
 
 
-def _scan_column(s: pd.Series, y: np.ndarray, k: int, folds: np.ndarray, threshold: float) -> dict[str, Any]:
+def _scan_column(
+    s: pd.Series, y: np.ndarray, k: int, folds: np.ndarray, threshold: float
+) -> dict[str, Any]:
     values, discrete = _column_values(s)
     sk = single_column_skill(values, discrete, y, k, folds)
     purity = _purity(_groups(s), y, k)
@@ -236,7 +256,9 @@ def detect_leaks(
     X = normalize_frame(X)
     y = pd.Series(np.asarray(y))
     if max_rows is not None and len(X) > max_rows:
-        keep = np.sort(np.random.RandomState(seed).choice(len(X), max_rows, replace=False))  # order kept
+        keep = np.sort(
+            np.random.RandomState(seed).choice(len(X), max_rows, replace=False)
+        )  # order kept
         X = X.iloc[keep]
         y = y.iloc[keep]
     yc, k = _codes(y)
@@ -253,15 +275,26 @@ def detect_leaks(
     flagged = bool(pos_skill >= threshold * 0.5 or z >= RUNS_Z_THRESHOLD)
     rep.row_order = {"position_skill": pos_skill, "runs_z": z, "flagged": flagged}
     rep.flags.append(
-        {"column": None, "type": "row_order", "score": float(max(pos_skill, min(z / (2 * RUNS_Z_THRESHOLD), 1.0))),
-         "flagged": flagged}
+        {
+            "column": None,
+            "type": "row_order",
+            "score": float(max(pos_skill, min(z / (2 * RUNS_Z_THRESHOLD), 1.0))),
+            "flagged": flagged,
+        }
     )
 
     # T4: overlap with the test table
     if X_test is not None:
         ov = _overlap(X, normalize_frame(X_test), seed)
         rep.overlap = ov
-        rep.flags.append({"column": None, "type": "train_test_overlap", "score": ov["observed_rate"], "flagged": ov["flagged"]})
+        rep.flags.append(
+            {
+                "column": None,
+                "type": "train_test_overlap",
+                "score": ov["observed_rate"],
+                "flagged": ov["flagged"],
+            }
+        )
 
     # false-positive rate on null columns
     if null_columns > 0:

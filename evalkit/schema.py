@@ -29,5 +29,17 @@ def validate(instance: Any, name: str) -> None:
     validator = jsonschema.Draft202012Validator(load_schema(name))
     errors = sorted(validator.iter_errors(instance), key=lambda e: list(e.absolute_path))
     if errors:
-        msg = "; ".join(f"{'/'.join(map(str, e.absolute_path)) or '<root>'}: {e.message}" for e in errors[:10])
+        msg = "; ".join(
+            f"{'/'.join(map(str, e.absolute_path)) or '<root>'}: {e.message}" for e in errors[:10]
+        )
         raise SchemaError(f"{name}: {msg}")
+
+
+def validate_def(instance: Any, name: str, definition: str) -> None:
+    """Validate against one `$defs` entry of a schema (e.g. a single run record)."""
+    schema = load_schema(name)
+    sub = {"$schema": schema["$schema"], "$ref": f"#/$defs/{definition}", "$defs": schema["$defs"]}
+    validator = jsonschema.Draft202012Validator(sub)
+    errors = list(validator.iter_errors(instance))
+    if errors:
+        raise SchemaError(f"{name}#{definition}: " + "; ".join(e.message for e in errors[:10]))

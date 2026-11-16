@@ -16,3 +16,5 @@ splits/
 .cache/
 report/site/
 results/*.tmp
+# smoke/skeleton outputs are regenerated; published benchmark results are added with `git add -f`
+results/

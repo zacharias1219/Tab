@@ -1,0 +1,6 @@
+- **Time-bounded baselines are not repeatable run to run.** FLAML and AutoGluon under a wall-clock limit explore different configurations on each run. Tab is bitwise deterministic only in trial-count mode.
+- **Small test sets make per-dataset verdicts noisy.** credit-g has 100 test rows per fold; a per-dataset interval over 5 folds is wide, so most per-dataset verdicts are ties.
+- **Ceiling datasets produce ties.** When every system is near perfect, differences are inside the noise.
+- **electricity is time-ordered.** Random folds leak the future into training and inflate every system there; the time-aware study reports the optimism gap.
+- **The leak detector flags legitimately strong features.** A single column that predicts the target well is flagged whether it is a leak or simply a great feature. Flags are for review, never automatic removal. Datasets stored sorted by class are flagged for row order.
+- **Calibration can hurt on tiny data.** Tab only applies temperature scaling when cross-fitted inner log loss improves, and reports ECE before and after.

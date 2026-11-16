@@ -1,0 +1,85 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - run: uv sync --locked --extra dev
+      - name: lint
+        run: uv run ruff check .
+      - name: types
+        run: uv run mypy --strict evalkit && uv run mypy tab
+      - name: HF-2 frozen dataset list
+        run: uv run python ci/dataset_hash.py
+      - name: HF-6 pre-registration order
+        run: uv run python ci/prereg_order.py
+      - name: locked tests
+        if: github.event_name == 'pull_request'
+        run: uv run python ci/test_lock.py origin/${{ github.base_ref }}..HEAD
+      - name: unit, contract, canary and eval tests (NFR-4 under 180 s)
+        run: uv run python ci/timing_gate.py 180 -- uv run python -m pytest -q
+      - name: dependency audit
+        run: uv export --locked --no-hashes --extra dev --format requirements-txt > req.txt && uvx pip-audit -r req.txt --progress-spinner off
+      - name: walking skeleton
+        run: uv run python -m bench.cli skeleton
+      - name: smoke repro (US-13, NFR-7 under 900 s)
+        run: uv run python ci/timing_gate.py 900 -- uv run python -m bench.cli repro --cpus 2
+      - name: verify smoke scores from saved predictions
+        run: uv run python -m bench.cli verify --results results/smoke/results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: results-page
+          path: report/site/
+
+  windows-tests:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - run: uv sync --locked --extra dev
+      - run: uv run python -m pytest -q
+      - run: uv run python -m bench.cli repro --cpus 2
+
+  bench-extra:
+    # FLAML and AutoGluon wrappers on the fixtures. Manual: the extra pulls large wheels.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - run: uv sync --locked --extra dev --extra bench
+      - run: uv run python -m pytest -q -m bench_extra
+
+  pages:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions: {contents: read, pages: write, id-token: write}
+    environment: {name: github-pages}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12 && uv sync --locked --extra dev
+      - name: build page (published full results if committed, else the smoke run)
+        run: |
+          if [ -f results/full/results.json ]; then uv run python -m report.build --results results/full/results.json --out site;
+          else uv run python -m bench.cli repro --cpus 2 && cp -r report/site/smoke site; fi
+      - uses: actions/upload-pages-artifact@v3
+        with: {path: site}
+      - uses: actions/deploy-pages@v4

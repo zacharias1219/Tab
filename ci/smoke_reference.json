@@ -1,0 +1,11 @@
+{
+  "description": "US-13 smoke repro reference intervals for skill score (log loss). Fixtures are bundled, fold 0, 20 s ceiling. Observed on 2026-11-16 over 4 runs at 1-3 CPUs (linux, Python 3.12): prior 0.0 exactly; logreg 0.3080 / 0.3935 (deterministic); tab 0.3092 / 0.3930 (time mode, controller plateau at 9 trials). Intervals widen those by +-0.02 for logreg (BLAS differences across platforms) and +-0.06 for tab (time-mode trial counts vary with machine speed).",
+  "skill_intervals": {
+    "prior/fixture_binary": [-1e-9, 1e-9],
+    "prior/fixture_multiclass": [-1e-9, 1e-9],
+    "logreg/fixture_binary": [0.288, 0.328],
+    "logreg/fixture_multiclass": [0.3735, 0.4135],
+    "tab/fixture_binary": [0.249, 0.369],
+    "tab/fixture_multiclass": [0.333, 0.453]
+  }
+}

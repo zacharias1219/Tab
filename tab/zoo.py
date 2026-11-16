@@ -53,7 +53,9 @@ def _mlp_sample(rng, n, d):
 
 
 FAMILIES: dict[str, Family] = {
-    "logistic": Family("logistic", "onehot", _logistic_sample, lambda n, d: {"C": 1.0}, lambda p: 1.0),
+    "logistic": Family(
+        "logistic", "onehot", _logistic_sample, lambda n, d: {"C": 1.0}, lambda p: 1.0
+    ),
     "random_forest": Family(
         "random_forest",
         "ordinal",
@@ -65,7 +67,12 @@ FAMILIES: dict[str, Family] = {
         "hist_gb",
         "ordinal",
         _hgb_sample,
-        lambda n, d: {"learning_rate": 0.1, "max_leaf_nodes": 31, "min_samples_leaf": 20, "l2_regularization": 0.0},
+        lambda n, d: {
+            "learning_rate": 0.1,
+            "max_leaf_nodes": 31,
+            "min_samples_leaf": 20,
+            "l2_regularization": 0.0,
+        },
         lambda p: 0.1 / p["learning_rate"] * (p["max_leaf_nodes"] / 31.0) ** 0.5,
     ),
     "mlp": Family(

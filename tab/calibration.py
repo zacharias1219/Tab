@@ -44,7 +44,9 @@ class CalibrationResult:
     log_loss_after: float
 
 
-def cross_fit_calibration(p: np.ndarray, y: np.ndarray, folds: np.ndarray, observer=None, index=None) -> CalibrationResult:
+def cross_fit_calibration(
+    p: np.ndarray, y: np.ndarray, folds: np.ndarray, observer=None, index=None
+) -> CalibrationResult:
     """Honest before/after numbers: for each inner fold, fit T on the other folds' OOF rows and
     apply it to this fold. `use` is True only if cross-fitted log loss improves.
     The returned temperature is fitted on all rows given (all of them inner-training rows)."""
