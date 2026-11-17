@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+*.egg-info/
+build/
+dist/
+# run outputs are produced locally and committed deliberately only via `make publish`
+runs/*
+!runs/.gitkeep
+labels/
+splits/
+.cache/
+report/site/
+results/*.tmp
+# smoke/skeleton outputs are regenerated; published benchmark results are added with `git add -f`
+results/

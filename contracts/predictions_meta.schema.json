@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tab.local/contracts/predictions_meta.schema.json",
+  "title": "Prediction metadata written by a system next to proba.npy",
+  "description": "A system may describe its predictions but may never report a score (HF-3). Unknown fields are rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "system", "system_version", "classes", "n_rows", "seed", "budget_s", "dtype"],
+  "properties": {
+    "schema_version": {"const": "1"},
+    "system": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$"},
+    "system_version": {"type": "string", "minLength": 1},
+    "classes": {"type": "array", "minItems": 2, "maxItems": 10, "items": {"type": "string"}},
+    "n_rows": {"type": "integer", "minimum": 1},
+    "seed": {"type": "integer", "minimum": 0},
+    "budget_s": {"type": "number", "exclusiveMinimum": 0},
+    "dtype": {"const": "float64"}
+  }
+}

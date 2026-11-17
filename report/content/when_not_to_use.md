@@ -1,0 +1,5 @@
+- You need regression, ranking, text, images or GPU training. Tab is tabular classification only.
+- Your table exceeds 50,000 rows, 200 columns or 10 classes. Tab raises an error instead of degrading silently.
+- You need the best possible accuracy for a production model. Tab does not try to beat AutoGluon; read the comparison table above.
+- Your data is time-ordered and you have not named the time column. Tab does not detect time columns automatically; random folds will overstate performance.
+- You need serving, a UI or distributed search. Tab is a library and a measurement harness, nothing more.

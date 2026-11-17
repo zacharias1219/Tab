@@ -1,0 +1,7 @@
+- **Subprocess per run instead of in-process calls.** Slower start-up, counted in actual seconds for every system equally, but a system cannot misreport time or memory, a crash cannot take the harness down, and baselines with conflicting dependencies can live apart.
+- **Plain files instead of a database or tracker.** A run directory either has a valid record or gets redone, so overnight batches resume for free. MLflow was rejected after the spike showed what it drags into the environment.
+- **Skill score on log loss as the only headline metric.** AUC and accuracy are shown, never decisive. A log-loss tie with an AUC win prints "tie".
+- **Same ceiling, compared on actual seconds** instead of "equal wall-clock". Every system gets the same limit; the table shows what each really used.
+- **No LLM anywhere.** Every claim must be checkable by deterministic code.
+- **Temperature scaling, not isotonic.** One parameter, fitted on inner out-of-fold predictions, applied only if cross-fitted log loss improves; isotonic overfits small data.
+- **sklearn HistGradientBoosting instead of LightGBM in the zoo.** Fewer dependencies, deterministic in trial mode; LightGBM-class models are still represented through the baselines.
